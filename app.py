@@ -1,5 +1,6 @@
 import os
-from datetime import datetime, timezone, timedelta
+from collections import defaultdict
+from datetime import datetime, timezone, timedelta, date as date_type
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -32,6 +33,22 @@ db.init_app(app)
 
 with app.app_context():
     db.create_all()
+
+
+# ---------------------------------------------------------------------------
+# Avatar colours (deterministic per user id)
+# ---------------------------------------------------------------------------
+
+_AVATAR_COLORS = [
+    "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7",
+    "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#82E0AA",
+    "#F8C471", "#85C1E9", "#F1948A", "#A9CCE3", "#A2D9CE",
+]
+
+
+@app.template_filter("avatar_color")
+def avatar_color(user_id):
+    return _AVATAR_COLORS[int(user_id) % len(_AVATAR_COLORS)]
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +90,6 @@ def admin_required(f):
 
 
 def _recalc_match(match):
-    """Recalculate points for all predictions of a match that has a result."""
     if not match.has_result:
         return
     for pred in match.predictions:
@@ -86,7 +102,6 @@ def _recalc_match(match):
 
 
 def _recalc_special():
-    """Recalculate special prediction points based on TournamentResult."""
     result = TournamentResult.query.first()
     if not result:
         return
@@ -116,7 +131,6 @@ def _leaderboard_data():
             "total": match_pts + special_pts,
         })
     rows.sort(key=lambda r: r["total"], reverse=True)
-    # Assign ranks (ties share rank)
     rank = 1
     for i, row in enumerate(rows):
         if i > 0 and row["total"] < rows[i - 1]["total"]:
@@ -143,13 +157,11 @@ def login():
     if request.method == "POST":
         pin = request.form.get("pin", "").strip()
 
-        # Admin check
         if pin == Config.ADMIN_PIN:
             session.clear()
             session["is_admin"] = True
             return redirect(url_for("admin"))
 
-        # User lookup — try each user
         matched = None
         for user in User.query.all():
             if check_password_hash(user.pin_hash, pin):
@@ -161,7 +173,7 @@ def login():
             session["user_id"] = matched.id
             return redirect(url_for("home"))
 
-        flash("Ongeldige code. Probeer opnieuw.")
+        flash("Ongeldige code — probeer opnieuw.")
     return render_template("login.html", kiosk_timeout=Config.KIOSK_TIMEOUT_SECONDS)
 
 
@@ -178,21 +190,11 @@ def logout():
 @app.route("/home")
 @login_required
 def home():
+    """Smart redirect: first-time users go to special predictions, else to matches."""
     user = _get_user()
-    tourn_pred = user.tourn_pred
-    tourn_locked = _tournament_locked()
-    # Count filled match predictions
-    filled = Prediction.query.filter_by(user_id=user.id).count()
-    total_matches = Match.query.count()
-    return render_template(
-        "home.html",
-        user=user,
-        tourn_pred=tourn_pred,
-        tourn_locked=tourn_locked,
-        filled=filled,
-        total_matches=total_matches,
-        kiosk_timeout=Config.KIOSK_TIMEOUT_SECONDS,
-    )
+    if user.tourn_pred is None and not _tournament_locked():
+        return redirect(url_for("special"))
+    return redirect(url_for("matches"))
 
 
 @app.route("/special", methods=["GET", "POST"])
@@ -221,8 +223,8 @@ def special():
         tp.red_cards = redcards
         tp.submitted_at = _now_utc()
         db.session.commit()
-        flash("Voorspellingen opgeslagen!")
-        return redirect(url_for("home"))
+        flash("Voorspellingen opgeslagen! 🎉")
+        return redirect(url_for("matches"))
 
     return render_template(
         "special.html",
@@ -240,29 +242,117 @@ def matches():
     user = _get_user()
     all_matches = Match.query.order_by(Match.kickoff_utc).all()
 
-    # Group by stage then date
+    # Group by CEST date (UTC+2)
+    days = defaultdict(list)
+    for m in all_matches:
+        cest_date = (m.kickoff_utc + timedelta(hours=2)).date()
+        days[cest_date].append(m)
+
+    sorted_dates = sorted(days.keys())
+
+    # Selected date from query param
+    selected_date = None
+    selected_str = request.args.get("date")
+    if selected_str:
+        try:
+            selected_date = date_type.fromisoformat(selected_str)
+        except (ValueError, TypeError):
+            pass
+
+    if selected_date not in days:
+        today = _now_utc().date()
+        upcoming = [d for d in sorted_dates if d >= today]
+        selected_date = upcoming[0] if upcoming else (sorted_dates[-1] if sorted_dates else today)
+
+    day_matches = days.get(selected_date, [])
+
     user_preds = {p.match_id: p for p in Prediction.query.filter_by(user_id=user.id).all()}
 
-    stages_order = [
-        "group", "round_of_32", "round_of_16",
-        "quarter_final", "semi_final", "third_place", "final",
-    ]
-    grouped = {s: [] for s in stages_order}
-    for m in all_matches:
-        grouped[m.stage].append({
-            "match": m,
-            "prediction": user_preds.get(m.id),
-            "locked": m.is_locked,
-        })
+    # Prev / next dates
+    if sorted_dates and selected_date in sorted_dates:
+        idx = sorted_dates.index(selected_date)
+        prev_date = sorted_dates[idx - 1] if idx > 0 else None
+        next_date = sorted_dates[idx + 1] if idx < len(sorted_dates) - 1 else None
+    else:
+        prev_date = next_date = None
+
+    total_day = len(day_matches)
+    predicted_day = sum(1 for m in day_matches if m.id in user_preds)
 
     return render_template(
         "matches.html",
         user=user,
-        grouped=grouped,
-        stage_labels=STAGE_LABELS,
-        stages_order=stages_order,
+        day_matches=day_matches,
+        user_preds=user_preds,
+        selected_date=selected_date,
+        prev_date=prev_date,
+        next_date=next_date,
+        total_day=total_day,
+        predicted_day=predicted_day,
         kiosk_timeout=Config.KIOSK_TIMEOUT_SECONDS,
     )
+
+
+@app.route("/matches/save", methods=["POST"])
+@login_required
+def matches_save():
+    """Bulk save all predictions submitted from the day view."""
+    user = _get_user()
+    redirect_date = request.form.get("date", "")
+    saved = 0
+
+    for key in request.form:
+        if not key.startswith("pred_home_"):
+            continue
+        try:
+            match_id = int(key[len("pred_home_"):])
+        except ValueError:
+            continue
+
+        home_str = request.form.get(f"pred_home_{match_id}", "").strip()
+        away_str = request.form.get(f"pred_away_{match_id}", "").strip()
+        if home_str == "" or away_str == "":
+            continue
+
+        try:
+            pred_home = int(home_str)
+            pred_away = int(away_str)
+        except ValueError:
+            continue
+
+        if pred_home < 0 or pred_away < 0:
+            continue
+
+        match = db.session.get(Match, match_id)
+        if not match or match.is_locked:
+            continue
+
+        existing = Prediction.query.filter_by(user_id=user.id, match_id=match_id).first()
+        if existing:
+            existing.pred_home = pred_home
+            existing.pred_away = pred_away
+            existing.submitted_at = _now_utc()
+            existing.points = None
+        else:
+            db.session.add(Prediction(
+                user_id=user.id,
+                match_id=match_id,
+                pred_home=pred_home,
+                pred_away=pred_away,
+            ))
+        saved += 1
+
+    db.session.commit()
+
+    if saved:
+        flash(f"{saved} voorspelling{'en' if saved != 1 else ''} opgeslagen! 🎉")
+    else:
+        flash("Niets opgeslagen — vul beide scores in.")
+
+    url = url_for("matches")
+    if redirect_date:
+        url += f"?date={redirect_date}"
+    return redirect(url)
 
 
 @app.route("/match/<match_code>", methods=["GET", "POST"])
@@ -270,7 +360,6 @@ def matches():
 def predict(match_code):
     user = _get_user()
     match = Match.query.filter_by(match_code=match_code).first_or_404()
-
     existing = Prediction.query.filter_by(user_id=user.id, match_id=match.id).first()
 
     if request.method == "POST":
@@ -289,26 +378,21 @@ def predict(match_code):
             existing.pred_home = pred_home
             existing.pred_away = pred_away
             existing.submitted_at = _now_utc()
-            existing.points = None  # reset until result re-entered
+            existing.points = None
         else:
-            pred = Prediction(
-                user_id=user.id,
-                match_id=match.id,
-                pred_home=pred_home,
-                pred_away=pred_away,
-            )
-            db.session.add(pred)
+            db.session.add(Prediction(
+                user_id=user.id, match_id=match.id,
+                pred_home=pred_home, pred_away=pred_away,
+            ))
 
         db.session.commit()
-        flash("Voorspelling opgeslagen!")
+        flash("Voorspelling opgeslagen! 🎉")
         return redirect(url_for("matches"))
 
     multiplier = STAGE_MULTIPLIERS.get(match.stage, 1)
     return render_template(
         "predict.html",
-        user=user,
-        match=match,
-        prediction=existing,
+        user=user, match=match, prediction=existing,
         stage_label=STAGE_LABELS.get(match.stage, match.stage),
         multiplier=multiplier,
         kiosk_timeout=Config.KIOSK_TIMEOUT_SECONDS,
@@ -321,8 +405,7 @@ def leaderboard():
     result = TournamentResult.query.first()
     return render_template(
         "leaderboard.html",
-        rows=rows,
-        result=result,
+        rows=rows, result=result,
         kiosk_timeout=Config.KIOSK_TIMEOUT_SECONDS,
         is_admin=session.get("is_admin", False),
         current_user_id=session.get("user_id"),
@@ -351,16 +434,14 @@ def api_leaderboard():
 @app.route("/admin")
 @admin_required
 def admin():
-    matches_with_results = Match.query.order_by(Match.kickoff_utc).all()
+    matches_all = Match.query.order_by(Match.kickoff_utc).all()
     result = TournamentResult.query.first()
     teams = Team.query.order_by(Team.group_letter, Team.name).all()
     users = User.query.order_by(User.name).all()
     return render_template(
         "admin.html",
-        matches=matches_with_results,
-        result=result,
-        teams=teams,
-        users=users,
+        matches=matches_all, result=result,
+        teams=teams, users=users,
         stage_labels=STAGE_LABELS,
     )
 
@@ -381,7 +462,7 @@ def admin_result(match_code):
     match.result_entered_at = _now_utc()
     db.session.commit()
     _recalc_match(match)
-    flash(f"Resultaat opgeslagen: {match.home_name} {home}–{away} {match.away_name}")
+    flash(f"Resultaat: {match.home_name} {home}–{away} {match.away_name}")
     return redirect(url_for("admin"))
 
 
@@ -425,28 +506,24 @@ def admin_special_result():
 @app.route("/admin/users", methods=["POST"])
 @admin_required
 def admin_add_user():
+    import random
     name = request.form.get("name", "").strip()
     if not name:
         flash("Naam is verplicht.")
         return redirect(url_for("admin"))
 
-    # Generate a unique 4-digit PIN
-    import random
     existing_hashes = [u.pin_hash for u in User.query.all()]
     for _ in range(1000):
         pin = str(random.randint(1000, 9999))
-        # Check that this PIN doesn't collide
-        clash = any(check_password_hash(h, pin) for h in existing_hashes)
-        if not clash:
+        if not any(check_password_hash(h, pin) for h in existing_hashes):
             break
     else:
         flash("Kon geen unieke PIN genereren.")
         return redirect(url_for("admin"))
 
-    user = User(name=name, pin_hash=generate_password_hash(pin))
-    db.session.add(user)
+    db.session.add(User(name=name, pin_hash=generate_password_hash(pin)))
     db.session.commit()
-    flash(f"Gebruiker '{name}' aangemaakt met PIN: {pin}  (noteer deze nu!)")
+    flash(f"'{name}' toegevoegd — PIN: {pin}  (noteer dit!)")
     return redirect(url_for("admin"))
 
 
@@ -463,17 +540,29 @@ def admin_delete_user(user_id):
     return redirect(url_for("admin"))
 
 
+@app.route("/admin/sync", methods=["POST"])
+@admin_required
+def admin_sync():
+    from fetcher import sync_results
+    summary = sync_results(app)
+    if summary["skipped"]:
+        flash("Sync overgeslagen — FDORG_API_KEY niet ingesteld.")
+    else:
+        flash(
+            f"Sync klaar: {summary['updated_results']} resultaten, "
+            f"{summary['updated_teams']} teams bijgewerkt."
+        )
+    return redirect(url_for("admin"))
+
+
 # ---------------------------------------------------------------------------
 # Template filters
 # ---------------------------------------------------------------------------
 
 @app.template_filter("cest")
 def to_cest(dt):
-    """Convert naive UTC datetime to CEST (UTC+2) string."""
     if dt is None:
         return ""
-    if isinstance(dt, str):
-        return dt
     cest = dt + timedelta(hours=2)
     return cest.strftime("%a %d %b %H:%M")
 
@@ -492,22 +581,6 @@ def to_cest_time(dt):
         return ""
     cest = dt + timedelta(hours=2)
     return cest.strftime("%H:%M")
-
-
-@app.route("/admin/sync", methods=["POST"])
-@admin_required
-def admin_sync():
-    """Trigger an immediate result sync from football-data.org."""
-    from fetcher import sync_results
-    summary = sync_results(app)
-    if summary["skipped"]:
-        flash("Sync overgeslagen — FDORG_API_KEY niet ingesteld.")
-    else:
-        flash(
-            f"Sync klaar: {summary['updated_results']} resultaten bijgewerkt, "
-            f"{summary['updated_teams']} teams ingevuld."
-        )
-    return redirect(url_for("admin"))
 
 
 if __name__ == "__main__":

@@ -1,30 +1,70 @@
 {% extends "base.html" %}
 {% block title %}Inloggen — WK Poule 2026{% endblock %}
 
-{% block content %}
-<main class="login-screen">
-  <header class="login-header">
-    <h1 class="app-title">WK Poule 2026</h1>
-    <p class="app-sub">🇺🇸🇨🇦🇲🇽 &nbsp;11 juni – 19 juli</p>
-  </header>
+{% block body %}
+<div class="screen screen--login">
 
-  <form class="pin-form" method="POST" action="{{ url_for('login') }}" autocomplete="off">
-    <label class="pin-label" for="pin">Voer je code in</label>
-    <input
-      class="pin-input"
-      id="pin"
-      name="pin"
-      type="tel"
-      inputmode="numeric"
-      pattern="[0-9]*"
-      maxlength="4"
-      placeholder="••••"
-      autofocus
-      required
-    >
-    <button class="btn-primary" type="submit">Inloggen</button>
+  <div class="login-logo">
+    <span class="logo-icon">⚽</span>
+    <div class="logo-name">FIFA WORLD CUP<br>2026</div>
+  </div>
+
+  <h1 class="hxl center">ENTER<br>YOUR CODE</h1>
+  <p class="login-sub">Voer jouw 4-cijferige code in<br>om automatisch in te loggen.</p>
+
+  <form method="post" id="pin-form" autocomplete="off">
+    <input type="hidden" name="pin" id="pin-val">
+
+    <p class="pin-label">FILL IN YOUR CODE</p>
+
+    <div class="pin-boxes">
+      <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" id="p0" autocomplete="off">
+      <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" id="p1" autocomplete="off">
+      <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" id="p2" autocomplete="off">
+      <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" id="p3" autocomplete="off">
+    </div>
+
+    <button type="submit" class="btn btn-dark" id="login-btn">LOG IN</button>
   </form>
 
-  <a class="leaderboard-link" href="{{ url_for('leaderboard') }}">Bekijk stand</a>
-</main>
+</div>
+
+<script>
+(function () {
+  var boxes = ['p0','p1','p2','p3'].map(function(id){ return document.getElementById(id); });
+  var hidden = document.getElementById('pin-val');
+  var form   = document.getElementById('pin-form');
+
+  function getPin() { return boxes.map(function(b){ return b.value; }).join(''); }
+
+  boxes.forEach(function(box, i) {
+    box.addEventListener('input', function() {
+      box.value = box.value.replace(/\D/g, '').slice(0, 1);
+      box.classList.toggle('filled', box.value.length > 0);
+      if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
+      if (getPin().length === 4) {
+        hidden.value = getPin();
+        form.submit();
+      }
+    });
+    box.addEventListener('keydown', function(e) {
+      if (e.key === 'Backspace' && !box.value && i > 0) {
+        boxes[i - 1].value = '';
+        boxes[i - 1].classList.remove('filled');
+        boxes[i - 1].focus();
+      }
+    });
+    box.addEventListener('paste', function(e) {
+      e.preventDefault();
+      var text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'');
+      text.slice(0, 4).split('').forEach(function(ch, j) {
+        if (boxes[j]) { boxes[j].value = ch; boxes[j].classList.add('filled'); }
+      });
+      if (text.length >= 4) { hidden.value = text.slice(0, 4); form.submit(); }
+    });
+  });
+
+  boxes[0].focus();
+}());
+</script>
 {% endblock %}

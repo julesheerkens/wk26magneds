@@ -1,65 +1,216 @@
 {% extends "base.html" %}
 {% block title %}Wedstrijden — WK Poule 2026{% endblock %}
 
-{% block content %}
-<main class="matches-screen">
-  <header class="top-bar">
-    <a class="back-btn" href="{{ url_for('home') }}">‹ Terug</a>
-    <span class="top-bar__title">Wedstrijden</span>
-    <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
-  </header>
+{% block body %}
+<div class="screen">
 
-  {% for stage in stages_order %}
-    {% if grouped[stage] %}
-      <section class="stage-section">
-        <h3 class="stage-title">{{ stage_labels[stage] }}</h3>
+  <!-- Top bar -->
+  <div class="top-bar">
+    <span class="top-bar__logo">⚽ WK POULE 2026</span>
+    <div class="top-bar__actions">
+      <a href="{{ url_for('leaderboard') }}" class="text-btn">STAND</a>
+      <a href="{{ url_for('logout') }}" class="text-btn">UIT</a>
+    </div>
+  </div>
 
-        {% set current_date = namespace(d=None) %}
-        {% for item in grouped[stage] %}
-          {% set m = item.match %}
-          {% set date_str = m.kickoff_utc | cest_date %}
-          {% if date_str != current_date.d %}
-            {% if current_date.d is not none %}</div>{% endif %}
-            <div class="day-group">
-            <div class="day-header">{{ date_str }}</div>
-            {% set current_date.d = date_str %}
+  <!-- Day navigator -->
+  <div class="day-nav">
+    {% if prev_date %}
+      <a href="{{ url_for('matches', date=prev_date) }}" class="day-nav__arrow">←</a>
+    {% else %}
+      <span class="day-nav__arrow day-nav__arrow--off">←</span>
+    {% endif %}
+
+    <div class="day-nav__center">
+      {% if selected_date %}
+        <div class="day-nav__name">{{ selected_date.strftime('%a %d %b')|upper }}</div>
+        <div class="day-nav__date">{{ selected_date.strftime('%Y') }}</div>
+      {% else %}
+        <div class="day-nav__name">—</div>
+      {% endif %}
+    </div>
+
+    {% if next_date %}
+      <a href="{{ url_for('matches', date=next_date) }}" class="day-nav__arrow">→</a>
+    {% else %}
+      <span class="day-nav__arrow day-nav__arrow--off">→</span>
+    {% endif %}
+  </div>
+
+  <!-- Page header -->
+  <div style="padding: 12px 20px 16px;">
+    <h1 class="hxl">TODAY'S<br>MATCHES</h1>
+    <p style="font-size:.825rem; opacity:.7; margin-top:8px; line-height:1.4;">
+      {% if day_matches %}
+        {{ predicted_day }}/{{ total_day }} ingevuld
+        {% if predicted_day == total_day and total_day > 0 %}&nbsp;· Alles opgeslagen ✓{% endif %}
+      {% else %}
+        Geen wedstrijden op deze dag.
+      {% endif %}
+    </p>
+  </div>
+
+  <!-- Match form -->
+  {% if day_matches %}
+  <form method="post" action="{{ url_for('matches_save') }}" id="mform">
+    <input type="hidden" name="date" value="{{ selected_date }}">
+    <div class="match-list">
+      {% for match in day_matches %}
+        {% set pred = user_preds.get(match.id) %}
+        {% set locked = match.is_locked %}
+        <div class="match-card{% if locked %} match-card--locked{% endif %}{% if match.has_result %} match-card--result{% endif %}">
+
+          <!-- Meta row -->
+          <div class="match-meta">
+            <span>{{ match.kickoff_utc | cest_time }} CEST</span>
+            <span>
+              {% if match.stage == 'group' %}GRP {{ match.group_letter }}
+              {% elif match.stage == 'round_of_32' %}R32
+              {% elif match.stage == 'round_of_16' %}R16
+              {% elif match.stage == 'quarter_final' %}QF
+              {% elif match.stage == 'semi_final' %}SF
+              {% elif match.stage == 'third_place' %}3E
+              {% elif match.stage == 'final' %}FINALE
+              {% endif %}
+            </span>
+            {% if locked %}<span>🔒</span>{% endif %}
+          </div>
+
+          <!-- Teams + score -->
+          <div class="match-row">
+
+            <!-- Home -->
+            <div class="team-side">
+              <div class="flag-wrap">
+                {% if match.home_team and match.home_team.flag_code %}
+                  <span class="fi fi-{{ match.home_team.flag_code }} fis"></span>
+                {% else %}
+                  <span style="font-size:.6rem;opacity:.45;">TBD</span>
+                {% endif %}
+              </div>
+              <span class="t-name">{{ match.home_name[:3]|upper }}</span>
+            </div>
+
+            <!-- Score -->
+            <div class="score-area">
+              {% if match.has_result %}
+                <div class="score-box">{{ match.actual_home }}</div>
+                <span class="score-sep">-</span>
+                <div class="score-box">{{ match.actual_away }}</div>
+              {% elif locked and pred %}
+                <div class="score-box score-box--pred">{{ pred.pred_home }}</div>
+                <span class="score-sep">-</span>
+                <div class="score-box score-box--pred">{{ pred.pred_away }}</div>
+              {% elif locked %}
+                <div class="score-box score-box--dim">?</div>
+                <span class="score-sep">-</span>
+                <div class="score-box score-box--dim">?</div>
+              {% else %}
+                <input type="number" name="pred_home_{{ match.id }}"
+                  class="score-input{% if pred %} has-val{% endif %}"
+                  min="0" max="99" inputmode="numeric"
+                  value="{{ pred.pred_home if pred else '' }}"
+                  placeholder="—">
+                <span class="score-sep">-</span>
+                <input type="number" name="pred_away_{{ match.id }}"
+                  class="score-input{% if pred %} has-val{% endif %}"
+                  min="0" max="99" inputmode="numeric"
+                  value="{{ pred.pred_away if pred else '' }}"
+                  placeholder="—">
+              {% endif %}
+            </div>
+
+            <!-- Away -->
+            <div class="team-side team-side--away">
+              <div class="flag-wrap">
+                {% if match.away_team and match.away_team.flag_code %}
+                  <span class="fi fi-{{ match.away_team.flag_code }} fis"></span>
+                {% else %}
+                  <span style="font-size:.6rem;opacity:.45;">TBD</span>
+                {% endif %}
+              </div>
+              <span class="t-name">{{ match.away_name[:3]|upper }}</span>
+            </div>
+
+          </div>
+
+          <!-- Points footer -->
+          {% if match.has_result and pred %}
+            <div class="match-footer">
+              <span style="opacity:.55;">Jij: {{ pred.pred_home }}–{{ pred.pred_away }}</span>
+              {% if pred.points is not none %}
+                <span class="pts-pill
+                  {% if pred.points >= 4 %}pts-pill--gold
+                  {% elif pred.points >= 2 %}pts-pill--green
+                  {% elif pred.points >= 1 %}pts-pill--blue
+                  {% endif %}">
+                  {{ pred.points }} PT{% if pred.points != 1 %}S{% endif %}
+                </span>
+              {% endif %}
+            </div>
+          {% elif match.has_result and not pred %}
+            <div class="match-footer">
+              <span style="opacity:.4; font-size:.7rem;">Niet ingevuld</span>
+            </div>
           {% endif %}
 
-          <a class="match-row {% if item.locked %}match-row--locked{% endif %} {% if item.prediction %}match-row--predicted{% endif %}"
-             href="{{ url_for('predict', match_code=m.match_code) }}">
+        </div>
+      {% endfor %}
+    </div>
+  </form>
+  {% else %}
+    <div class="empty-state">
+      <span class="e-icon">📅</span>
+      <p>Geen wedstrijden op deze dag.<br>Gebruik de pijlen om te navigeren.</p>
+    </div>
+  {% endif %}
 
-            <div class="match-row__teams">
-              <span class="team-name team-name--home">{{ m.home_name }}</span>
-              <span class="match-row__vs">vs</span>
-              <span class="team-name team-name--away">{{ m.away_name }}</span>
-            </div>
+  <div class="bottom-spacer"></div>
+</div>
 
-            <div class="match-row__meta">
-              <span class="kickoff-time">{{ m.kickoff_utc | cest_time }} CEST</span>
-              {% if m.has_result %}
-                <span class="result-badge">{{ m.actual_home }}–{{ m.actual_away }}</span>
-              {% elif item.locked %}
-                <span class="lock-badge">🔒</span>
-              {% endif %}
-            </div>
+<!-- Bottom action bar (save + next day) -->
+{% set has_open = namespace(v=false) %}
+{% for m in day_matches %}
+  {% if not m.is_locked %}{% set has_open.v = true %}{% endif %}
+{% endfor %}
 
-            <div class="match-row__prediction">
-              {% if item.prediction %}
-                <span class="my-pred">{{ item.prediction.pred_home }}–{{ item.prediction.pred_away }}</span>
-                {% if item.prediction.points is not none %}
-                  <span class="pred-points">{{ item.prediction.points }} pt</span>
-                {% endif %}
-              {% else %}
-                <span class="pred-empty">Nog invullen</span>
-              {% endif %}
-            </div>
+<div class="bottom-bar">
+  {% if next_date %}
+    <a href="{{ url_for('matches', date=next_date) }}" class="btn btn-dark">VOLGENDE DAG →</a>
+  {% endif %}
+  {% if has_open.v %}
+    <button type="submit" form="mform" class="btn btn-white">OPSLAAN</button>
+  {% endif %}
+</div>
 
-          </a>
-        {% endfor %}
-        {% if current_date.d is not none %}</div>{% endif %}
+<!-- Bottom nav -->
+<nav class="bottom-nav">
+  <a href="{{ url_for('matches') }}" class="nav-tab active">
+    <span class="ico">⚽</span>Wedstrijden
+  </a>
+  <a href="{{ url_for('special') }}" class="nav-tab">
+    <span class="ico">🏆</span>Vragen
+  </a>
+  <a href="{{ url_for('leaderboard') }}" class="nav-tab">
+    <span class="ico">📊</span>Stand
+  </a>
+  <a href="{{ url_for('logout') }}" class="nav-tab">
+    <span class="ico">👋</span>Uit
+  </a>
+</nav>
 
-      </section>
-    {% endif %}
-  {% endfor %}
-</main>
+{% block scripts %}
+<script>
+/* Auto-advance to the next score input after entering a digit */
+document.querySelectorAll('.score-input').forEach(function(inp) {
+  inp.addEventListener('input', function() {
+    if (inp.value.length >= 2) inp.value = inp.value.slice(-1);
+    inp.classList.toggle('has-val', inp.value !== '');
+    /* Jump: home → away */
+    var next = inp.closest('.score-area').querySelector('.score-input:last-of-type');
+    if (next && next !== inp && inp.value !== '') next.focus();
+  });
+});
+</script>
+{% endblock %}
 {% endblock %}

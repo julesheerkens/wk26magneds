@@ -1,66 +1,101 @@
 {% extends "base.html" %}
 {% block title %}Stand — WK Poule 2026{% endblock %}
 
-{% block content %}
-<main class="leaderboard-screen">
-  <header class="top-bar">
+{% block body %}
+<div class="screen">
+
+  <!-- Top bar -->
+  <div class="top-bar">
     {% if current_user_id %}
-      <a class="back-btn" href="{{ url_for('home') }}">‹ Terug</a>
-    {% elif is_admin %}
-      <a class="back-btn" href="{{ url_for('admin') }}">‹ Admin</a>
+      <a href="{{ url_for('matches') }}" class="icon-btn">←</a>
     {% else %}
-      <a class="back-btn" href="{{ url_for('login') }}">‹ Inloggen</a>
+      <span style="width:36px;"></span>
     {% endif %}
-    <span class="top-bar__title">Stand</span>
-    {% if current_user_id %}
-      <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
+    <span class="top-bar__logo">⚽ WK POULE 2026</span>
+    {% if is_admin %}
+      <a href="{{ url_for('admin') }}" class="text-btn">ADMIN</a>
+    {% elif current_user_id %}
+      <a href="{{ url_for('logout') }}" class="text-btn">UIT</a>
+    {% else %}
+      <a href="{{ url_for('login') }}" class="text-btn">LOGIN</a>
     {% endif %}
-  </header>
+  </div>
 
+  <!-- Header -->
+  <div style="padding: 12px 20px 20px;">
+    <h1 class="hxl">LEADER<br>BOARD</h1>
+    <p style="font-size:.825rem; opacity:.68; margin-top:8px;">
+      {{ rows|length }} deelnemer{% if rows|length != 1 %}s{% endif %}
+      {% if result %} · Eindresultaten bekend{% endif %}
+    </p>
+  </div>
+
+  <!-- Rankings -->
   {% if rows %}
-    <table class="leaderboard-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Naam</th>
-          <th title="Wedstrijd-punten">⚽</th>
-          <th title="Toernooi-vragen punten">🏆</th>
-          <th>Totaal</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-          <tr class="{% if row.user.id == current_user_id %}leaderboard-row--me{% endif %}
-                     {% if row.rank == 1 %}leaderboard-row--first{% endif %}">
-            <td class="rank-cell">
-              {% if row.rank == 1 %}🥇
-              {% elif row.rank == 2 %}🥈
-              {% elif row.rank == 3 %}🥉
-              {% else %}{{ row.rank }}{% endif %}
-            </td>
-            <td class="name-cell">{{ row.user.name }}</td>
-            <td class="pts-cell">{{ row.match_points }}</td>
-            <td class="pts-cell">{{ row.special_points }}</td>
-            <td class="total-cell"><strong>{{ row.total }}</strong></td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="lb-list">
+    {% for row in rows %}
+      {% set u = row.user %}
+      {% set rank = row.rank %}
+      <div class="lb-row
+        {% if rank == 1 %}lb-row--1
+        {% elif rank == 2 %}lb-row--2
+        {% elif rank == 3 %}lb-row--3
+        {% endif %}
+        {% if current_user_id and u.id == current_user_id %}lb-row--me{% endif %}
+      ">
+
+        <!-- Rank -->
+        <div class="lb-rank {% if rank <= 3 %}lb-rank--{{ rank }}{% endif %}">{{ rank }}</div>
+
+        <!-- Avatar (colored circle with initial) -->
+        <div class="lb-avatar" style="background-color: {{ u.id | avatar_color }};">
+          {{ u.name[0]|upper }}
+        </div>
+
+        <!-- Name + detail -->
+        <div class="lb-info">
+          <div class="lb-name">{{ u.name|upper }}</div>
+          <div class="lb-detail">
+            {{ row.match_points }} match
+            {% if row.special_points %} · {{ row.special_points }} speciaal{% endif %}
+          </div>
+        </div>
+
+        <!-- Total points -->
+        <div class="lb-score">
+          <div class="lb-pts">{{ row.total }}</div>
+          <div class="lb-lbl">PTS</div>
+        </div>
+
+      </div>
+    {% endfor %}
+  </div>
   {% else %}
-    <p class="empty-state">Nog geen deelnemers of punten.</p>
+    <div class="empty-state">
+      <span class="e-icon">🏆</span>
+      <p>Nog geen punten — het toernooi<br>begint op 11 juni 2026!</p>
+    </div>
   {% endif %}
 
-  {% if result %}
-    <section class="tourn-result-summary">
-      <h3>Toernooiresultaten</h3>
-      <ul>
-        {% if result.winner_team %}<li>🏆 Winnaar: <strong>{{ result.winner_team.name }}</strong></li>{% endif %}
-        {% if result.topscorer_goals is not none %}<li>⚽ Topscorer goals: <strong>{{ result.topscorer_goals }}</strong></li>{% endif %}
-        {% if result.red_cards_total is not none %}<li>🟥 Rode kaarten: <strong>{{ result.red_cards_total }}</strong></li>{% endif %}
-      </ul>
-    </section>
-  {% endif %}
+  <div style="height: 90px;"></div>
+</div>
 
-  <p class="leaderboard-note">Stand wordt automatisch bijgewerkt als resultaten worden ingevoerd.</p>
-</main>
+<!-- Bottom nav (only when logged in) -->
+{% if current_user_id %}
+<nav class="bottom-nav">
+  <a href="{{ url_for('matches') }}" class="nav-tab">
+    <span class="ico">⚽</span>Wedstrijden
+  </a>
+  <a href="{{ url_for('special') }}" class="nav-tab">
+    <span class="ico">🏆</span>Vragen
+  </a>
+  <a href="{{ url_for('leaderboard') }}" class="nav-tab active">
+    <span class="ico">📊</span>Stand
+  </a>
+  <a href="{{ url_for('logout') }}" class="nav-tab">
+    <span class="ico">👋</span>Uit
+  </a>
+</nav>
+{% endif %}
+
 {% endblock %}

@@ -2,25 +2,38 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#E8441C">
   <title>{% block title %}WK Poule 2026{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css">
 </head>
-<body {% if kiosk_timeout is defined %}data-timeout="{{ kiosk_timeout }}"{% endif %}>
+<body {% if kiosk_timeout is defined and kiosk_timeout %}data-timeout="{{ kiosk_timeout }}"{% endif %}>
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      <div class="flash-messages">
-        {% for msg in messages %}
-          <div class="flash">{{ msg }}</div>
-        {% endfor %}
-      </div>
+  {% block body %}{% endblock %}
+
+  {% with msgs = get_flashed_messages() %}
+    {% if msgs %}
+    <div class="toast-wrap" id="toast-wrap">
+      {% for m in msgs %}
+        <div class="toast">{{ m }}</div>
+      {% endfor %}
+    </div>
+    <script>
+      setTimeout(function() {
+        var w = document.getElementById('toast-wrap');
+        if (w) { w.style.opacity = '0'; setTimeout(function(){ w && w.remove(); }, 350); }
+      }, 3200);
+    </script>
     {% endif %}
   {% endwith %}
 
-  {% block content %}{% endblock %}
-
+  {% if kiosk_timeout is defined and kiosk_timeout %}
   <script src="{{ url_for('static', filename='kiosk.js') }}"></script>
+  {% endif %}
+
+  {% block scripts %}{% endblock %}
 </body>
 </html>

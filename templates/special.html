@@ -1,70 +1,104 @@
 {% extends "base.html" %}
-{% block title %}Toernooi­vragen — WK Poule 2026{% endblock %}
+{% block title %}Toernooivragen — WK Poule 2026{% endblock %}
 
-{% block content %}
-<main class="special-screen">
-  <header class="top-bar">
-    <a class="back-btn" href="{{ url_for('home') }}">‹ Terug</a>
-    <span class="top-bar__title">Toernooivragen</span>
-    <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
-  </header>
+{% block body %}
+<div class="screen">
 
-  {% if tourn_locked %}
-    <div class="lock-notice">🔒 Voorspellingen gesloten — het toernooi is begonnen.</div>
-  {% endif %}
+  <!-- Top bar -->
+  <div class="top-bar">
+    <a href="{{ url_for('matches') }}" class="icon-btn" title="Terug">←</a>
+    <span class="top-bar__logo">⚽ WK POULE 2026</span>
+    <a href="{{ url_for('logout') }}" class="text-btn">UIT</a>
+  </div>
 
-  <section class="special-info">
-    <p>Deze drie vragen kun je invullen tot de aftrap van de eerste wedstrijd
-       <strong>(11 juni 2026, 21:00 CEST)</strong>.</p>
-    <ul class="scoring-legend">
-      <li>🏆 Juiste winnaar: <strong>15 punten</strong></li>
-      <li>⚽ Topscorer goals exact: <strong>10 pt</strong> &nbsp;|&nbsp; ±2: <strong>5 pt</strong></li>
-      <li>🟥 Rode kaarten exact: <strong>8 pt</strong> &nbsp;|&nbsp; ±5: <strong>4 pt</strong> &nbsp;|&nbsp; ±10: <strong>2 pt</strong></li>
-    </ul>
-  </section>
+  <!-- Header -->
+  <div style="padding: 16px 20px 22px;">
+    <p style="font-size:.7rem; font-weight:700; letter-spacing:.14em; opacity:.58; text-transform:uppercase; margin-bottom:8px;">WELKOM</p>
+    <h1 class="hxl">{{ user.name|upper }}</h1>
+    <p style="font-size:.875rem; opacity:.72; margin-top:10px; line-height:1.5;">
+      {% if tourn_locked %}
+        Voorspellingen zijn gesloten — het toernooi is begonnen.
+      {% else %}
+        Jouw speciale voorspellingen vóór het toernooi.<br>Kunnen tot 11 juni 21:00 CEST worden aangepast.
+      {% endif %}
+    </p>
+  </div>
 
-  <form class="special-form" method="POST" action="{{ url_for('special') }}">
+  <!-- Form -->
+  <form method="post" class="special-form">
 
-    <div class="form-group">
-      <label for="winner_team_id">1. Welk land wint het WK?</label>
-      <select name="winner_team_id" id="winner_team_id" {% if tourn_locked %}disabled{% endif %} required>
-        <option value="">— Kies een land —</option>
-        {% set current_group = namespace(g=None) %}
-        {% for team in teams %}
-          {% if team.group_letter != current_group.g %}
-            {% if current_group.g is not none %}</optgroup>{% endif %}
-            <optgroup label="Groep {{ team.group_letter }}">
-            {% set current_group.g = team.group_letter %}
-          {% endif %}
-          <option value="{{ team.id }}"
-            {% if tourn_pred and tourn_pred.winner_team_id == team.id %}selected{% endif %}>
-            {{ team.name }}
-          </option>
-        {% endfor %}
-        </optgroup>
-      </select>
+    <!-- 1. Tournament winner -->
+    <div class="q-block">
+      <div class="q-label">WIE WINT HET TOERNOOI?</div>
+      <p class="q-hint">15 punten bij een correcte voorspelling.</p>
+      <div class="sel-wrap">
+        <select name="winner_team_id" class="q-select" {% if tourn_locked %}disabled{% endif %} required>
+          <option value="">— Kies een land —</option>
+          {% for group_letter, group_teams in teams|groupby('group_letter') %}
+            <optgroup label="Groep {{ group_letter }}">
+              {% for team in group_teams %}
+                <option value="{{ team.id }}"
+                  {% if tourn_pred and tourn_pred.winner_team_id == team.id %}selected{% endif %}>
+                  {{ team.name }}
+                </option>
+              {% endfor %}
+            </optgroup>
+          {% endfor %}
+        </select>
+      </div>
     </div>
 
-    <div class="form-group">
-      <label for="topscorer_goals">2. Hoeveel goals maakt de topscorer?</label>
-      <input type="number" name="topscorer_goals" id="topscorer_goals"
-             min="1" max="30" placeholder="bv. 8"
-             value="{{ tourn_pred.topscorer_goals if tourn_pred else '' }}"
-             {% if tourn_locked %}disabled{% endif %} required>
+    <!-- 2. Top scorer goals -->
+    <div class="q-block">
+      <div class="q-label">HOEVEEL GOALS SCOORT DE TOPSCORER?</div>
+      <p class="q-hint">10 pt exact · 5 pt binnen ±2 goals.</p>
+      <input
+        type="number" name="topscorer_goals" class="q-input"
+        placeholder="Aantal goals…" min="0" max="30"
+        value="{{ tourn_pred.topscorer_goals if tourn_pred and tourn_pred.topscorer_goals is not none else '' }}"
+        {% if tourn_locked %}disabled{% endif %}
+        inputmode="numeric"
+      >
     </div>
 
-    <div class="form-group">
-      <label for="red_cards">3. Hoeveel rode kaarten in het hele toernooi?</label>
-      <input type="number" name="red_cards" id="red_cards"
-             min="0" max="200" placeholder="bv. 28"
-             value="{{ tourn_pred.red_cards if tourn_pred else '' }}"
-             {% if tourn_locked %}disabled{% endif %} required>
-      <p class="form-hint">Ter referentie: bij vorige toernooien waren het er 20–40.</p>
+    <!-- 3. Red cards -->
+    <div class="q-block">
+      <div class="q-label">HOEVEEL RODE KAARTEN IN HET TOERNOOI?</div>
+      <p class="q-hint">8 pt exact · 4 pt binnen ±5 · 2 pt binnen ±10.</p>
+      <input
+        type="number" name="red_cards" class="q-input"
+        placeholder="Aantal rode kaarten…" min="0" max="200"
+        value="{{ tourn_pred.red_cards if tourn_pred and tourn_pred.red_cards is not none else '' }}"
+        {% if tourn_locked %}disabled{% endif %}
+        inputmode="numeric"
+      >
     </div>
 
     {% if not tourn_locked %}
-      <button class="btn-primary" type="submit">Opslaan</button>
+    <div style="padding-bottom: 16px;">
+      <button type="submit" class="btn btn-dark">OPSLAAN</button>
+    </div>
     {% endif %}
+
   </form>
-</main>
+
+  <!-- Spacer for bottom nav -->
+  <div style="height: 80px;"></div>
+</div>
+
+<!-- Bottom nav -->
+<nav class="bottom-nav">
+  <a href="{{ url_for('matches') }}" class="nav-tab">
+    <span class="ico">⚽</span>Wedstrijden
+  </a>
+  <a href="{{ url_for('special') }}" class="nav-tab active">
+    <span class="ico">🏆</span>Vragen
+  </a>
+  <a href="{{ url_for('leaderboard') }}" class="nav-tab">
+    <span class="ico">📊</span>Stand
+  </a>
+  <a href="{{ url_for('logout') }}" class="nav-tab">
+    <span class="ico">👋</span>Uit
+  </a>
+</nav>
 {% endblock %}
