@@ -6,6 +6,7 @@ Bereikbaar voor iedereen op hetzelfde wifi via http://<jouw-ip>:5000
 """
 
 import logging
+import os
 import socket
 
 from dotenv import load_dotenv
