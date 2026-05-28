@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Inloggen — WK Poule 2026{% endblock %}
+
+{% block content %}
+<main class="login-screen">
+  <header class="login-header">
+    <h1 class="app-title">WK Poule 2026</h1>
+    <p class="app-sub">🇺🇸🇨🇦🇲🇽 &nbsp;11 juni – 19 juli</p>
+  </header>
+
+  <form class="pin-form" method="POST" action="{{ url_for('login') }}" autocomplete="off">
+    <label class="pin-label" for="pin">Voer je code in</label>
+    <input
+      class="pin-input"
+      id="pin"
+      name="pin"
+      type="tel"
+      inputmode="numeric"
+      pattern="[0-9]*"
+      maxlength="4"
+      placeholder="••••"
+      autofocus
+      required
+    >
+    <button class="btn-primary" type="submit">Inloggen</button>
+  </form>
+
+  <a class="leaderboard-link" href="{{ url_for('leaderboard') }}">Bekijk stand</a>
+</main>
+{% endblock %}

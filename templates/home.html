@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Home — WK Poule 2026{% endblock %}
+
+{% block content %}
+<main class="home-screen">
+  <header class="top-bar">
+    <span class="user-name">{{ user.name }}</span>
+    <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
+  </header>
+
+  <h2 class="screen-title">Mijn voorspellingen</h2>
+
+  <nav class="home-nav">
+    <a class="nav-card {% if tourn_pred %}nav-card--done{% else %}nav-card--todo{% endif %}"
+       href="{{ url_for('special') }}">
+      <span class="nav-card__icon">🏆</span>
+      <span class="nav-card__label">Toernooi&shy;vragen</span>
+      <span class="nav-card__status">
+        {% if tourn_pred %}Ingevuld{% elif tourn_locked %}Gesloten{% else %}Nog invullen{% endif %}
+      </span>
+    </a>
+
+    <a class="nav-card {% if filled == total_matches %}nav-card--done{% else %}nav-card--todo{% endif %}"
+       href="{{ url_for('matches') }}">
+      <span class="nav-card__icon">⚽</span>
+      <span class="nav-card__label">Wedstrijden</span>
+      <span class="nav-card__status">{{ filled }} / {{ total_matches }}</span>
+    </a>
+
+    <a class="nav-card" href="{{ url_for('leaderboard') }}">
+      <span class="nav-card__icon">📊</span>
+      <span class="nav-card__label">Stand</span>
+      <span class="nav-card__status">Bekijk</span>
+    </a>
+  </nav>
+</main>
+{% endblock %}

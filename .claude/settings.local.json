@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Jules\\\\Documents\\\\WKPoule\" -Force)",
+      "Bash(Select-Object Name, FullName, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "WebFetch(domain:www.fifa.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.nbcsports.com)",
+      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\Jules\\\\Documents\\\\WKPoule\\\\data\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\Jules\\\\Documents\\\\WKPoule\\\\templates\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\Jules\\\\Documents\\\\WKPoule\\\\static\")",
+      "PowerShell(Get-Command py -ErrorAction SilentlyContinue; Get-Command python3 -ErrorAction SilentlyContinue; $env:PATH -split ';' | Where-Object { $_ -match 'python|py' })",
+      "PowerShell(cd \"C:\\\\Users\\\\Jules\\\\Documents\\\\WKPoule\"; $proc = Start-Process -FilePath \"py\" -ArgumentList \"serve.py\" -PassThru -RedirectStandardOutput \"serve_out.txt\" -RedirectStandardError \"serve_err.txt\"; Start-Sleep -Seconds 4; try { $r = Invoke-WebRequest \"http://localhost:5000/login\" -UseBasicParsing -TimeoutSec 5; \"HTTP $\\($r.StatusCode\\) — Waitress werkt\" } catch { \"Fout: $_\" }; Stop-Process -Id $proc.Id -ErrorAction SilentlyContinue; Get-Content serve_out.txt -ErrorAction SilentlyContinue; Remove-Item serve_out.txt,serve_err.txt -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

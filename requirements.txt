@@ -1,0 +1,8 @@
+flask>=3.0
+flask-sqlalchemy>=3.1
+werkzeug>=3.0
+python-dotenv>=1.0
+requests>=2.31
+apscheduler>=3.10
+waitress>=3.0
+psycopg2-binary>=2.9

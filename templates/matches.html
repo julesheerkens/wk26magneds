@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Wedstrijden — WK Poule 2026{% endblock %}
+
+{% block content %}
+<main class="matches-screen">
+  <header class="top-bar">
+    <a class="back-btn" href="{{ url_for('home') }}">‹ Terug</a>
+    <span class="top-bar__title">Wedstrijden</span>
+    <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
+  </header>
+
+  {% for stage in stages_order %}
+    {% if grouped[stage] %}
+      <section class="stage-section">
+        <h3 class="stage-title">{{ stage_labels[stage] }}</h3>
+
+        {% set current_date = namespace(d=None) %}
+        {% for item in grouped[stage] %}
+          {% set m = item.match %}
+          {% set date_str = m.kickoff_utc | cest_date %}
+          {% if date_str != current_date.d %}
+            {% if current_date.d is not none %}</div>{% endif %}
+            <div class="day-group">
+            <div class="day-header">{{ date_str }}</div>
+            {% set current_date.d = date_str %}
+          {% endif %}
+
+          <a class="match-row {% if item.locked %}match-row--locked{% endif %} {% if item.prediction %}match-row--predicted{% endif %}"
+             href="{{ url_for('predict', match_code=m.match_code) }}">
+
+            <div class="match-row__teams">
+              <span class="team-name team-name--home">{{ m.home_name }}</span>
+              <span class="match-row__vs">vs</span>
+              <span class="team-name team-name--away">{{ m.away_name }}</span>
+            </div>
+
+            <div class="match-row__meta">
+              <span class="kickoff-time">{{ m.kickoff_utc | cest_time }} CEST</span>
+              {% if m.has_result %}
+                <span class="result-badge">{{ m.actual_home }}–{{ m.actual_away }}</span>
+              {% elif item.locked %}
+                <span class="lock-badge">🔒</span>
+              {% endif %}
+            </div>
+
+            <div class="match-row__prediction">
+              {% if item.prediction %}
+                <span class="my-pred">{{ item.prediction.pred_home }}–{{ item.prediction.pred_away }}</span>
+                {% if item.prediction.points is not none %}
+                  <span class="pred-points">{{ item.prediction.points }} pt</span>
+                {% endif %}
+              {% else %}
+                <span class="pred-empty">Nog invullen</span>
+              {% endif %}
+            </div>
+
+          </a>
+        {% endfor %}
+        {% if current_date.d is not none %}</div>{% endif %}
+
+      </section>
+    {% endif %}
+  {% endfor %}
+</main>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Admin — WK Poule 2026{% endblock %}
+
+{% block content %}
+<main class="admin-screen">
+  <header class="top-bar">
+    <span class="top-bar__title">⚙ Admin</span>
+    <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
+  </header>
+
+  <!-- Users -->
+  <section class="admin-section">
+    <h2>Deelnemers</h2>
+    <form class="admin-form" method="POST" action="{{ url_for('admin_add_user') }}">
+      <input type="text" name="name" placeholder="Naam deelnemer" required>
+      <button class="btn-primary btn-sm" type="submit">+ Toevoegen</button>
+    </form>
+
+    <table class="admin-table">
+      <thead><tr><th>Naam</th><th></th></tr></thead>
+      <tbody>
+        {% for u in users %}
+          <tr>
+            <td>{{ u.name }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+                    onsubmit="return confirm('Verwijder {{ u.name }}?')">
+                <button class="btn-danger btn-sm" type="submit">✕</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Tournament special results -->
+  <section class="admin-section">
+    <h2>Toernooiresultaten</h2>
+    <form class="admin-form" method="POST" action="{{ url_for('admin_special_result') }}">
+      <div class="form-group">
+        <label>Winnaar</label>
+        <select name="winner_team_id">
+          <option value="">— Nog onbekend —</option>
+          {% for team in teams %}
+            <option value="{{ team.id }}"
+              {% if result and result.winner_team_id == team.id %}selected{% endif %}>
+              {{ team.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Topscorer goals</label>
+        <input type="number" name="topscorer_goals" min="0" max="50"
+               value="{{ result.topscorer_goals if result and result.topscorer_goals is not none else '' }}"
+               placeholder="—">
+      </div>
+      <div class="form-group">
+        <label>Rode kaarten totaal</label>
+        <input type="number" name="red_cards_total" min="0" max="500"
+               value="{{ result.red_cards_total if result and result.red_cards_total is not none else '' }}"
+               placeholder="—">
+      </div>
+      <button class="btn-primary" type="submit">Opslaan &amp; herberekenen</button>
+    </form>
+  </section>
+
+  <!-- Match results -->
+  <section class="admin-section">
+    <h2>Wedstrijdresultaten</h2>
+
+    {% set current_stage = namespace(s=None) %}
+    {% for m in matches %}
+      {% if m.stage != current_stage.s %}
+        {% if current_stage.s is not none %}</div>{% endif %}
+        <div class="admin-stage-group">
+        <h3 class="stage-title">{{ stage_labels[m.stage] }}</h3>
+        {% set current_stage.s = m.stage %}
+      {% endif %}
+
+      <div class="admin-match-row">
+        <div class="admin-match-info">
+          <span class="admin-match-code">{{ m.match_code }}</span>
+          <span class="admin-match-teams">{{ m.home_name }} vs {{ m.away_name }}</span>
+          <span class="admin-match-time">{{ m.kickoff_utc.strftime('%d %b %H:%M') }} UTC</span>
+        </div>
+
+        {% if m.has_result %}
+          <div class="admin-result-badge">{{ m.actual_home }}–{{ m.actual_away }}</div>
+        {% endif %}
+
+        <!-- Enter / update result -->
+        <form class="admin-result-form" method="POST"
+              action="{{ url_for('admin_result', match_code=m.match_code) }}">
+          <input class="score-mini" type="number" name="actual_home"
+                 min="0" max="30" placeholder="{{ m.actual_home if m.actual_home is not none else '0' }}"
+                 value="{{ m.actual_home if m.actual_home is not none else '' }}">
+          <span>–</span>
+          <input class="score-mini" type="number" name="actual_away"
+                 min="0" max="30" placeholder="{{ m.actual_away if m.actual_away is not none else '0' }}"
+                 value="{{ m.actual_away if m.actual_away is not none else '' }}">
+          <button class="btn-primary btn-sm" type="submit">✓</button>
+        </form>
+
+        <!-- Set knockout teams -->
+        {% if m.stage != 'group' %}
+          <form class="admin-teams-form" method="POST"
+                action="{{ url_for('admin_set_teams', match_code=m.match_code) }}">
+            <select name="home_team_id">
+              <option value="">{{ m.home_name }}</option>
+              {% for team in teams %}
+                <option value="{{ team.id }}">{{ team.name }}</option>
+              {% endfor %}
+            </select>
+            <select name="away_team_id">
+              <option value="">{{ m.away_name }}</option>
+              {% for team in teams %}
+                <option value="{{ team.id }}">{{ team.name }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn-secondary btn-sm" type="submit">Teams</button>
+          </form>
+        {% endif %}
+      </div>
+
+    {% endfor %}
+    {% if current_stage.s is not none %}</div>{% endif %}
+  </section>
+
+  <!-- Auto-sync -->
+  <section class="admin-section">
+    <h2>Automatische sync</h2>
+    <p class="admin-hint">
+      Resultaten en knock-outteams worden automatisch opgehaald van football-data.org
+      (elke 5 minuten als <code>FDORG_API_KEY</code> is ingesteld).
+      Of gebruik de knop voor een directe sync.
+    </p>
+    <form method="POST" action="{{ url_for('admin_sync') }}">
+      <button class="btn-primary" type="submit" style="margin-top:10px">
+        ↻ Sync nu
+      </button>
+    </form>
+  </section>
+
+  <section class="admin-section">
+    <a class="btn-secondary" href="{{ url_for('leaderboard') }}">Bekijk stand</a>
+  </section>
+</main>
+{% endblock %}

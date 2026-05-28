@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Stand — WK Poule 2026{% endblock %}
+
+{% block content %}
+<main class="leaderboard-screen">
+  <header class="top-bar">
+    {% if current_user_id %}
+      <a class="back-btn" href="{{ url_for('home') }}">‹ Terug</a>
+    {% elif is_admin %}
+      <a class="back-btn" href="{{ url_for('admin') }}">‹ Admin</a>
+    {% else %}
+      <a class="back-btn" href="{{ url_for('login') }}">‹ Inloggen</a>
+    {% endif %}
+    <span class="top-bar__title">Stand</span>
+    {% if current_user_id %}
+      <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
+    {% endif %}
+  </header>
+
+  {% if rows %}
+    <table class="leaderboard-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Naam</th>
+          <th title="Wedstrijd-punten">⚽</th>
+          <th title="Toernooi-vragen punten">🏆</th>
+          <th>Totaal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr class="{% if row.user.id == current_user_id %}leaderboard-row--me{% endif %}
+                     {% if row.rank == 1 %}leaderboard-row--first{% endif %}">
+            <td class="rank-cell">
+              {% if row.rank == 1 %}🥇
+              {% elif row.rank == 2 %}🥈
+              {% elif row.rank == 3 %}🥉
+              {% else %}{{ row.rank }}{% endif %}
+            </td>
+            <td class="name-cell">{{ row.user.name }}</td>
+            <td class="pts-cell">{{ row.match_points }}</td>
+            <td class="pts-cell">{{ row.special_points }}</td>
+            <td class="total-cell"><strong>{{ row.total }}</strong></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty-state">Nog geen deelnemers of punten.</p>
+  {% endif %}
+
+  {% if result %}
+    <section class="tourn-result-summary">
+      <h3>Toernooiresultaten</h3>
+      <ul>
+        {% if result.winner_team %}<li>🏆 Winnaar: <strong>{{ result.winner_team.name }}</strong></li>{% endif %}
+        {% if result.topscorer_goals is not none %}<li>⚽ Topscorer goals: <strong>{{ result.topscorer_goals }}</strong></li>{% endif %}
+        {% if result.red_cards_total is not none %}<li>🟥 Rode kaarten: <strong>{{ result.red_cards_total }}</strong></li>{% endif %}
+      </ul>
+    </section>
+  {% endif %}
+
+  <p class="leaderboard-note">Stand wordt automatisch bijgewerkt als resultaten worden ingevoerd.</p>
+</main>
+{% endblock %}

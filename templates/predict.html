@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Voorspel — {{ match.home_name }} vs {{ match.away_name }}{% endblock %}
+
+{% block content %}
+<main class="predict-screen">
+  <header class="top-bar">
+    <a class="back-btn" href="{{ url_for('matches') }}">‹ Terug</a>
+    <span class="top-bar__title">Voorspelling</span>
+    <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
+  </header>
+
+  <section class="match-card">
+    <div class="match-card__stage">{{ stage_label }}
+      {% if multiplier > 1 %}
+        <span class="multiplier-badge">×{{ multiplier | int if multiplier == multiplier | int else multiplier }}</span>
+      {% endif %}
+    </div>
+
+    <div class="match-card__teams">
+      <div class="team-block">
+        <div class="team-flag">{{ match.home_team.flag_code if match.home_team else '🌐' }}</div>
+        <div class="team-block__name">{{ match.home_name }}</div>
+      </div>
+      <div class="match-card__divider">vs</div>
+      <div class="team-block">
+        <div class="team-flag">{{ match.away_team.flag_code if match.away_team else '🌐' }}</div>
+        <div class="team-block__name">{{ match.away_name }}</div>
+      </div>
+    </div>
+
+    <div class="match-card__info">
+      <span class="match-card__time">{{ match.kickoff_utc | cest }} CEST</span>
+      <span class="match-card__venue">{{ match.venue }}</span>
+    </div>
+
+    {% if match.has_result %}
+      <div class="result-display">
+        Uitslag: <strong>{{ match.actual_home }} – {{ match.actual_away }}</strong>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="scoring-legend scoring-legend--compact">
+    <div class="legend-row"><span>Juiste uitslag</span><strong>{{ 4 * multiplier | round(0, 'ceil') | int }} pt</strong></div>
+    <div class="legend-row"><span>Juiste doelsaldo</span><strong>{{ 2 * multiplier | round(0, 'ceil') | int }} pt</strong></div>
+    <div class="legend-row"><span>Juiste winnaar</span><strong>{{ 1 * multiplier | round(0, 'ceil') | int }} pt</strong></div>
+  </section>
+
+  {% if match.is_locked %}
+    <div class="lock-notice">🔒 Wedstrijd gesloten — voorspelling kan niet meer worden gewijzigd.</div>
+    {% if prediction %}
+      <div class="locked-prediction">
+        Jouw voorspelling: <strong>{{ prediction.pred_home }} – {{ prediction.pred_away }}</strong>
+        {% if prediction.points is not none %}
+          &nbsp;→ <strong class="points-earned">{{ prediction.points }} punt{{ 'en' if prediction.points != 1 }}</strong>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="lock-notice">Je hebt geen voorspelling ingediend voor deze wedstrijd.</div>
+    {% endif %}
+  {% else %}
+    <form class="predict-form" method="POST" action="{{ url_for('predict', match_code=match.match_code) }}">
+      <div class="score-inputs">
+        <div class="score-input-group">
+          <label>{{ match.home_name }}</label>
+          <input class="score-input" type="number" name="pred_home"
+                 min="0" max="30" inputmode="numeric"
+                 value="{{ prediction.pred_home if prediction else '' }}"
+                 placeholder="0" required>
+        </div>
+        <div class="score-separator">–</div>
+        <div class="score-input-group">
+          <label>{{ match.away_name }}</label>
+          <input class="score-input" type="number" name="pred_away"
+                 min="0" max="30" inputmode="numeric"
+                 value="{{ prediction.pred_away if prediction else '' }}"
+                 placeholder="0" required>
+        </div>
+      </div>
+      <p class="predict-note">Score na 90 minuten (geen rekening met verlenging/strafschoppen).</p>
+      <button class="btn-primary" type="submit">
+        {% if prediction %}Wijzigen{% else %}Opslaan{% endif %}
+      </button>
+    </form>
+  {% endif %}
+</main>
+{% endblock %}

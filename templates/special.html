@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Toernooi­vragen — WK Poule 2026{% endblock %}
+
+{% block content %}
+<main class="special-screen">
+  <header class="top-bar">
+    <a class="back-btn" href="{{ url_for('home') }}">‹ Terug</a>
+    <span class="top-bar__title">Toernooivragen</span>
+    <a class="logout-btn" href="{{ url_for('logout') }}">Uitloggen</a>
+  </header>
+
+  {% if tourn_locked %}
+    <div class="lock-notice">🔒 Voorspellingen gesloten — het toernooi is begonnen.</div>
+  {% endif %}
+
+  <section class="special-info">
+    <p>Deze drie vragen kun je invullen tot de aftrap van de eerste wedstrijd
+       <strong>(11 juni 2026, 21:00 CEST)</strong>.</p>
+    <ul class="scoring-legend">
+      <li>🏆 Juiste winnaar: <strong>15 punten</strong></li>
+      <li>⚽ Topscorer goals exact: <strong>10 pt</strong> &nbsp;|&nbsp; ±2: <strong>5 pt</strong></li>
+      <li>🟥 Rode kaarten exact: <strong>8 pt</strong> &nbsp;|&nbsp; ±5: <strong>4 pt</strong> &nbsp;|&nbsp; ±10: <strong>2 pt</strong></li>
+    </ul>
+  </section>
+
+  <form class="special-form" method="POST" action="{{ url_for('special') }}">
+
+    <div class="form-group">
+      <label for="winner_team_id">1. Welk land wint het WK?</label>
+      <select name="winner_team_id" id="winner_team_id" {% if tourn_locked %}disabled{% endif %} required>
+        <option value="">— Kies een land —</option>
+        {% set current_group = namespace(g=None) %}
+        {% for team in teams %}
+          {% if team.group_letter != current_group.g %}
+            {% if current_group.g is not none %}</optgroup>{% endif %}
+            <optgroup label="Groep {{ team.group_letter }}">
+            {% set current_group.g = team.group_letter %}
+          {% endif %}
+          <option value="{{ team.id }}"
+            {% if tourn_pred and tourn_pred.winner_team_id == team.id %}selected{% endif %}>
+            {{ team.name }}
+          </option>
+        {% endfor %}
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="topscorer_goals">2. Hoeveel goals maakt de topscorer?</label>
+      <input type="number" name="topscorer_goals" id="topscorer_goals"
+             min="1" max="30" placeholder="bv. 8"
+             value="{{ tourn_pred.topscorer_goals if tourn_pred else '' }}"
+             {% if tourn_locked %}disabled{% endif %} required>
+    </div>
+
+    <div class="form-group">
+      <label for="red_cards">3. Hoeveel rode kaarten in het hele toernooi?</label>
+      <input type="number" name="red_cards" id="red_cards"
+             min="0" max="200" placeholder="bv. 28"
+             value="{{ tourn_pred.red_cards if tourn_pred else '' }}"
+             {% if tourn_locked %}disabled{% endif %} required>
+      <p class="form-hint">Ter referentie: bij vorige toernooien waren het er 20–40.</p>
+    </div>
+
+    {% if not tourn_locked %}
+      <button class="btn-primary" type="submit">Opslaan</button>
+    {% endif %}
+  </form>
+</main>
+{% endblock %}
